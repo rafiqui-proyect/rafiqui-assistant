@@ -770,9 +770,24 @@
             startReminderMonitor();
             requestWakeLock();
             
-            // Si el URL tiene el parámetro auto_listen, iniciamos la escucha de una vez (ideal para atajos)
             const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('auto') === 'true' || urlParams.get('auto_listen') === 'true') {
+            const dictatedText = urlParams.get('text') || urlParams.get('q');
+            
+            if (dictatedText) {
+                console.log("[SIRI INPUT] " + dictatedText);
+                chatBubble.innerHTML = `<span>Procesando orden de Siri...</span>`;
+                
+                // Desbloqueo inmediato de voz en iOS al cargar vía Atajo
+                if (window.speechSynthesis) {
+                    const unlockUtterance = new SpeechSynthesisUtterance(" ");
+                    unlockUtterance.volume = 0;
+                    window.speechSynthesis.speak(unlockUtterance);
+                }
+                
+                setTimeout(() => {
+                    processUserSpeech(dictatedText);
+                }, 300);
+            } else if (urlParams.get('auto') === 'true' || urlParams.get('auto_listen') === 'true') {
                 setTimeout(() => {
                     triggerVoiceActivation();
                 }, 1000);
