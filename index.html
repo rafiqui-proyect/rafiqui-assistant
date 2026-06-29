@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Rafiqui - Asistente Siri</title>
+    <!-- Configuración PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Rafiqui">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-dark: #070714;
+            --card-bg: rgba(20, 20, 35, 0.7);
+            --border: rgba(255, 255, 255, 0.08);
+            --accent: #00f2ff;
+            --accent-glow: rgba(0, 242, 255, 0.4);
+            --purple: #9d4edd;
+            --purple-glow: rgba(157, 78, 221, 0.4);
+            --text: #ffffff;
+            --text-dim: #94a3b8;
+            --danger: #ff0055;
+            --success: #00ffaa;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(157, 78, 221, 0.15), transparent 45%),
+                radial-gradient(circle at 90% 80%, rgba(0, 242, 255, 0.15), transparent 45%);
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        /* Pantalla Principal */
+        #main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px;
+            position: relative;
+        }
+
+        header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 10px 0 10px;
+            z-index: 10;
+        }
+
+        .status-badge {
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-transform: uppercase;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 8px var(--success);
+        }
+
+        .status-dot.offline {
+            background: #ffaa00;
+            box-shadow: 0 0 8px #ffaa00;
+        }
+
+        .icon-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: var(--text);
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .icon-btn:active {
+            transform: scale(0.9);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Avatar de Rafiqui Siri */
+        .avatar-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-top: -30px;
+        }
+
+        .avatar-container {
+            position: relative;
+            width: 220px;
+            height: 220px;
+            margin-bottom: 25px;
+        }
+
+        .avatar-image {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            z-index: 2;
+            position: relative;
+            background: #000;
+            cursor: pointer;
+        }
+
+        /* Halo Siri Reactivo */
+        .halo {
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            right: -10px;
+            bottom: -10px;
+            border-radius: 50%;
+            z-index: 1;
+            background: conic-gradient(from 0deg, var(--accent), var(--purple), var(--accent));
+            opacity: 0.4;
+            filter: blur(10px);
+            transition: all 0.5s ease;
+            animation: rotateHalo 6s linear infinite;
+        }
+
+        @keyframes rotateHalo {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Animaciones según estado */
+        .avatar-container.listening .halo {
+            opacity: 0.9;
+            filter: blur(15px);
+            transform: scale(1.15);
+            animation: pulseListening 1.2s infinite ease-in-out, rotateHalo 3s linear infinite;
+        }
+
+        .avatar-container.speaking .halo {
+            opacity: 0.9;
+            filter: blur(12px);
+            transform: scale(1.08);
+            animation: pulseSpeaking 0.6s infinite ease-in-out, rotateHalo 1.5s linear infinite;
+        }
+
+        .avatar-container.processing .halo {
+            opacity: 0.8;
+            filter: blur(8px);
+            animation: rotateHalo 0.8s linear infinite;
+        }
+
+        @keyframes pulseListening {
+            0%, 100% { transform: scale(1.05) rotate(0deg); opacity: 0.7; }
+            50% { transform: scale(1.2) rotate(180deg); opacity: 1; }
+        }
+
+        @keyframes pulseSpeaking {
+            0%, 100% { transform: scale(1.03) rotate(0deg); }
+            50% { transform: scale(1.12) rotate(180deg); }
+        }
+
+        .chat-bubble {
+            max-width: 90%;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 15px 25px;
+            font-size: 1.1rem;
+            line-height: 1.5;
+            text-align: center;
+            backdrop-filter: blur(20px);
+            margin: 0 10px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            color: #e2e8f0;
+            min-height: 55px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pulse-text {
+            color: var(--accent);
+            font-weight: 600;
+            animation: textPulse 1.5s infinite;
+        }
+
+        @keyframes textPulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        /* Sección de control de voz inferior */
+        .controls-section {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            padding-bottom: 25px;
+            z-index: 10;
+        }
+
+        .mic-btn {
+            background: linear-gradient(135deg, var(--accent), var(--purple));
+            border: none;
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            color: #000;
+            box-shadow: 0 0 30px var(--accent-glow);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .mic-btn:active {
+            transform: scale(0.9);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        .mic-btn.active {
+            background: var(--danger);
+            color: white;
+            box-shadow: 0 0 30px rgba(255, 0, 85, 0.6);
+            animation: micPulse 1.2s infinite ease-in-out;
+        }
+
+        @keyframes micPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+
+        .instruction-hint {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            text-align: center;
+        }
+
+        /* Panel deslizable de Agenda */
+        .sheet-trigger {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 10px 20px;
+            border-radius: 20px 20px 0 0;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            width: 160px;
+            justify-content: center;
+            margin-top: -10px;
+        }
+
+        .agenda-sheet {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 80vh;
+            background: rgba(10, 10, 22, 0.95);
+            backdrop-filter: blur(30px);
+            border-top: 1px solid var(--border);
+            border-radius: 30px 30px 0 0;
+            z-index: 100;
+            transform: translateY(100%);
+            transition: transform 0.4s cubic-bezier(0.1, 0.76, 0.55, 0.94);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .agenda-sheet.open {
+            transform: translateY(0);
+        }
+
+        .sheet-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .sheet-drag {
+            width: 40px;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            margin: 0 auto 15px auto;
+        }
+
+        .sheet-title {
+            font-size: 1.4rem;
+            font-weight: 800;
+        }
+
+        .agenda-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            padding: 10px;
+            border-radius: 12px;
+            color: var(--text-dim);
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            background: rgba(0, 242, 255, 0.1);
+            color: var(--accent);
+            border-color: var(--accent-glow);
+        }
+
+        .agenda-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-bottom: 30px;
+        }
+
+        .agenda-item {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            padding: 15px;
+            border-radius: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .agenda-details {
+            flex: 1;
+            padding-right: 15px;
+        }
+
+        .agenda-text {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #efefff;
+            margin-bottom: 5px;
+        }
+
+        .agenda-meta {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            display: flex;
+            gap: 8px;
+        }
+
+        .agenda-meta span.time {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .delete-btn {
+            background: rgba(255, 0, 85, 0.15);
+            border: 1px solid rgba(255, 0, 85, 0.3);
+            color: #ff3b30;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .delete-btn:active {
+            background: rgba(255, 0, 85, 0.3);
+            transform: scale(0.95);
+        }
+
+        /* Pantalla de Alerta de Recordatorio Vencido */
+        #alert-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle, #25020c, #070104);
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            animation: alertPulseOverlay 1.5s infinite alternate;
+        }
+
+        @keyframes alertPulseOverlay {
+            from { background-color: #070104; }
+            to { background-color: #200109; }
+        }
+
+        .alert-card {
+            background: rgba(255, 0, 85, 0.1);
+            border: 2px solid var(--danger);
+            border-radius: 24px;
+            padding: 30px;
+            width: 100%;
+            max-width: 350px;
+            text-align: center;
+            box-shadow: 0 0 50px rgba(255, 0, 85, 0.3);
+            backdrop-filter: blur(20px);
+            animation: scaleInAlert 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes scaleInAlert {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .alert-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            animation: alertWiggle 0.5s infinite;
+            display: inline-block;
+        }
+
+        @keyframes alertWiggle {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-8deg); }
+            75% { transform: rotate(8deg); }
+        }
+
+        .alert-title {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: var(--danger);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .alert-content {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 25px;
+            line-height: 1.4;
+        }
+
+        .alert-btn {
+            background: var(--danger);
+            border: none;
+            color: white;
+            font-size: 1rem;
+            font-weight: 800;
+            padding: 15px 40px;
+            border-radius: 50px;
+            cursor: pointer;
+            width: 100%;
+            box-shadow: 0 0 20px rgba(255, 0, 85, 0.5);
+            transition: all 0.2s;
+        }
+
+        .alert-btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 0 10px rgba(255, 0, 85, 0.5);
+        }
+
+        /* Modal de Ajustes (Configurar API KEY e Instrucciones) */
+        .settings-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(5, 5, 12, 0.95);
+            backdrop-filter: blur(25px);
+            z-index: 500;
+            display: none;
+            flex-direction: column;
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .settings-title {
+            font-size: 1.6rem;
+            font-weight: 800;
+        }
+
+        .settings-section {
+            margin-bottom: 25px;
+        }
+
+        .settings-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .settings-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            padding: 14px;
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+            margin-bottom: 10px;
+            outline: none;
+        }
+
+        .settings-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .save-btn {
+            background: var(--accent);
+            border: none;
+            color: #000;
+            font-size: 1rem;
+            font-weight: 700;
+            padding: 12px 25px;
+            border-radius: 12px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .instruction-box {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            border-radius: 15px;
+            padding: 15px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: #cbd5e1;
+        }
+
+        .instruction-step {
+            margin-bottom: 12px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .instruction-step::before {
+            content: "•";
+            color: var(--accent);
+            font-size: 1.2rem;
+            position: absolute;
+            left: 5px;
+            top: -2px;
+        }
+
+        .instruction-step strong {
+            color: white;
+        }
+
+        /* Capa oscurecedora para el panel deslizable */
+        .scrim {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 90;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .scrim.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Pantalla Principal -->
+    <div id="main-container">
+        
+        <header>
+            <div class="status-badge">
+                <div id="status-dot" class="status-dot"></div>
+                <span id="status-text">Online</span>
+            </div>
+            <button class="icon-btn" onclick="toggleSettings(true)" title="Ajustes">⚙️</button>
+        </header>
+
+        <!-- Sección de Avatar -->
+        <div class="avatar-section">
+            <div class="avatar-container" id="avatar-container">
+                <div class="halo"></div>
+                <img src="rafiqui_avatar.jpg" alt="Rafiqui Avatar" class="avatar-image" id="avatar-img" onclick="triggerVoiceActivation()">
+            </div>
+            <div class="chat-bubble" id="chat-bubble">
+                <span>Hola, soy Rafiqui. Toca mi imagen o di mi nombre para dictarme algo.</span>
+            </div>
+        </div>
+
+        <!-- Controles y Hints -->
+        <div class="controls-section">
+            <button class="mic-btn" id="mic-btn" onclick="triggerVoiceActivation()" title="Activar micrófono">🎤</button>
+            <div class="instruction-hint" id="instruction-hint">Dí "Rafiqui" o presiona el botón para hablar</div>
+            <button class="sheet-trigger" onclick="toggleAgenda(true)">📅 Ver Agenda</button>
+        </div>
+
+    </div>
+
+    <!-- Capa Oscurecedora -->
+    <div class="scrim" id="scrim" onclick="toggleAgenda(false)"></div>
+
+    <!-- Panel de Agenda (Deslizable) -->
+    <div class="agenda-sheet" id="agenda-sheet">
+        <div class="sheet-drag" onclick="toggleAgenda(false)"></div>
+        <div class="sheet-header">
+            <h2 class="sheet-title">Mi Agenda</h2>
+            <button class="icon-btn" onclick="toggleAgenda(false)" style="font-size:1rem; width:30px; height:30px;">✕</button>
+        </div>
+        
+        <div class="agenda-tabs">
+            <button class="tab-btn active" id="tab-reminders" onclick="switchAgendaTab('reminders')">Alarmas/Tareas</button>
+            <button class="tab-btn" id="tab-notes" onclick="switchAgendaTab('notes')">Notas Rápidas</button>
+        </div>
+
+        <div class="agenda-list" id="agenda-list">
+            <!-- Cargado dinámicamente -->
+        </div>
+    </div>
+
+    <!-- Pantalla de Alerta por Recordatorio Vencido -->
+    <div id="alert-overlay">
+        <div class="alert-card">
+            <div class="alert-icon">🔔</div>
+            <h3 class="alert-title">Recordatorio</h3>
+            <p class="alert-content" id="alert-message">Mensaje del recordatorio</p>
+            <button class="alert-btn" onclick="dismissReminderAlert()">ENTENDIDO</button>
+        </div>
+    </div>
+
+    <!-- Modal de Ajustes -->
+    <div class="settings-modal" id="settings-modal">
+        <div class="settings-header">
+            <h2 class="settings-title">Configuración</h2>
+            <button class="icon-btn" onclick="toggleSettings(false)">✕</button>
+        </div>
+
+        <div class="settings-section">
+            <label class="settings-label">Gemini API Key (Google Cloud)</label>
+            <input type="password" id="api-key-input" class="settings-input" placeholder="Pega tu clave AIzaSy...">
+            <button class="save-btn" onclick="saveApiKey()">Guardar Clave</button>
+            <small style="color:var(--text-dim); margin-top:5px; display:block;">Tu clave se guarda localmente en el iPhone de manera privada.</small>
+        </div>
+
+        <div class="settings-section">
+            <label class="settings-label">Instrucciones para Atajos de iPhone</label>
+            <div class="instruction-box">
+                <div class="instruction-step">
+                    <strong>Paso 1:</strong> Abre la app de <strong>Atajos</strong> nativa en tu iPhone y crea un atajo llamado exactamente <strong>"Llamar a Rafiqui"</strong>.
+                </div>
+                <div class="instruction-step">
+                    <strong>Paso 2:</strong> Agrégale la acción <strong>"Abrir URL"</strong> y escribe la dirección actual de este navegador.
+                </div>
+                <div class="instruction-step">
+                    <strong>Paso 3 (Oye Siri):</strong> Ahora, solo di <em>"Oye Siri, llama a Rafiqui"</em> y se abrirá automáticamente esta aplicación lista para escucharte.
+                </div>
+                <div class="instruction-step">
+                    <strong>Paso 4 (Doble Toque):</strong> En tu iPhone, ve a <strong>Ajustes -> Accesibilidad -> Tocar -> Toque posterior</strong>. Selecciona "Pulsar dos veces" y asígnalo al atajo "Llamar a Rafiqui". Con esto, al dar dos golpecitos a la parte trasera se abrirá el asistente.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- VARIABLES DE ESTADO ---
+        let apiKey = localStorage.getItem('gemini_api_key') || "";
+        let currentTab = "reminders"; // 'reminders' o 'notes'
+        let recognition = null;
+        let isListening = false;
+        let isSpeaking = false;
+        let wakeLock = null;
+        let reminderCheckingInterval = null;
+        let speechVoice = null;
+        
+        const chatBubble = document.getElementById('chat-bubble');
+        const avatarContainer = document.getElementById('avatar-container');
+        const micBtn = document.getElementById('mic-btn');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+
+        // --- INICIALIZACIÓN ---
+        window.addEventListener('DOMContentLoaded', () => {
+            checkOnlineStatus();
+            initSpeechRecognition();
+            initSpeechSynthesis();
+            loadAgenda();
+            startReminderMonitor();
+            requestWakeLock();
+            
+            // Si el URL tiene el parámetro auto_listen, iniciamos la escucha de una vez (ideal para atajos)
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('auto') === 'true' || urlParams.get('auto_listen') === 'true') {
+                setTimeout(() => {
+                    triggerVoiceActivation();
+                }, 1000);
+            }
+        });
+
+        window.addEventListener('online', checkOnlineStatus);
+        window.addEventListener('offline', checkOnlineStatus);
+
+        function checkOnlineStatus() {
+            if (navigator.onLine) {
+                statusDot.classList.remove('offline');
+                statusText.innerText = "Online";
+            } else {
+                statusDot.classList.add('offline');
+                statusText.innerText = "Offline Mode";
+            }
+        }
+
+        // Evitar que la pantalla del iPhone se apague (Wake Lock)
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log("[WAKELOCK] Pantalla bloqueada para siempre activa.");
+                }
+            } catch (e) {
+                console.log("[WAKELOCK] No soportado o denegado.");
+            }
+        }
+
+        // --- SONIDOS VIA WEB AUDIO API (Offline) ---
+        function playChime(type) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                
+                if (type === 'start') {
+                    // Chime ascendente Siri-like
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(600, ctx.currentTime);
+                    osc.frequency.setValueAtTime(900, ctx.currentTime + 0.12);
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.4);
+                } else if (type === 'success') {
+                    // Tono doble de éxito
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(880, ctx.currentTime);
+                    osc.frequency.setValueAtTime(1200, ctx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.35);
+                } else if (type === 'alarm') {
+                    // Alarma de alerta cíclica
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(520, ctx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(880, ctx.currentTime + 0.25);
+                    gain.gain.setValueAtTime(0.4, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.5);
+                }
+            } catch(e) {
+                console.error("Audio Context Error:", e);
+            }
+        }
+
+        // --- MOTOR DE VOZ: SPEECH RECOGNITION (STT) ---
+        function initSpeechRecognition() {
+            const SpeechLib = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechLib) {
+                chatBubble.innerHTML = "<span style='color:var(--danger);'>Reconocimiento de voz no soportado en este navegador. Usa Safari en tu iPhone.</span>";
+                return;
+            }
+
+            recognition = new SpeechLib();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'es-ES';
+
+            recognition.onstart = () => {
+                isListening = true;
+                setAvatarState('listening');
+                chatBubble.innerHTML = "<span class='pulse-text'>Te escucho...</span>";
+                playChime('start');
+            };
+
+            recognition.onresult = (event) => {
+                const text = event.results[0][0].transcript;
+                console.log("[STT RESULT] " + text);
+                processUserSpeech(text);
+            };
+
+            recognition.onerror = (event) => {
+                console.error("[STT ERROR]", event.error);
+                if (event.error === 'not-allowed') {
+                    chatBubble.innerHTML = "<span style='color:var(--danger);'>Permiso de micrófono denegado. Habilítalo en los ajustes de Safari.</span>";
+                } else {
+                    chatBubble.innerText = "No logré escucharte bien. Toca la pantalla e intenta de nuevo.";
+                }
+                setAvatarState('idle');
+            };
+
+            recognition.onend = () => {
+                isListening = false;
+                if (avatarContainer.classList.contains('listening')) {
+                    setAvatarState('idle');
+                }
+            };
+        }
+
+        // Trigger voice recognition
+        function triggerVoiceActivation() {
+            if (isSpeaking) {
+                window.speechSynthesis.cancel();
+                isSpeaking = false;
+            }
+            
+            if (isListening) {
+                recognition.stop();
+            } else if (recognition) {
+                try {
+                    recognition.start();
+                } catch (e) {
+                    console.log("Re-start error: ", e);
+                }
+            }
+        }
+
+        // --- MOTOR DE VOZ: SPEECH SYNTHESIS (TTS) ---
+        function initSpeechSynthesis() {
+            if (!window.speechSynthesis) return;
+            
+            // Cargar y seleccionar la mejor voz en español
+            const selectVoice = () => {
+                const voices = window.speechSynthesis.getVoices();
+                // Buscar voces en español (Sonia, Monica, Paulina, etc. de iOS)
+                speechVoice = voices.find(v => v.lang.includes('es-') || v.lang.includes('es_')) || voices[0];
+            };
+
+            selectVoice();
+            if (window.speechSynthesis.onvoiceschanged !== undefined) {
+                window.speechSynthesis.onvoiceschanged = selectVoice;
+            }
+        }
+
+        function speak(text, onCompleteCallback) {
+            if (!window.speechSynthesis) {
+                if (onCompleteCallback) onCompleteCallback();
+                return;
+            }
+
+            window.speechSynthesis.cancel(); // Cancelar cualquier audio anterior
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            if (speechVoice) utterance.voice = speechVoice;
+            utterance.lang = 'es-MX';
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+
+            utterance.onstart = () => {
+                isSpeaking = true;
+                setAvatarState('speaking');
+            };
+
+            utterance.onend = () => {
+                isSpeaking = false;
+                setAvatarState('idle');
+                if (onCompleteCallback) onCompleteCallback();
+            };
+
+            utterance.onerror = (e) => {
+                console.error("TTS error", e);
+                isSpeaking = false;
+                setAvatarState('idle');
+                if (onCompleteCallback) onCompleteCallback();
+            };
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // Cambiar estados visuales del Avatar de Rafiqui
+        function setAvatarState(state) {
+            avatarContainer.classList.remove('listening', 'speaking', 'processing');
+            micBtn.classList.remove('active');
+
+            if (state === 'listening') {
+                avatarContainer.classList.add('listening');
+                micBtn.classList.add('active');
+            } else if (state === 'speaking') {
+                avatarContainer.classList.add('speaking');
+            } else if (state === 'processing') {
+                avatarContainer.classList.add('processing');
+            }
+        }
+
+        // --- PROCESAMIENTO DE DICTADO ---
+        async function processUserSpeech(text) {
+            chatBubble.innerText = `"${text}"`;
+            setAvatarState('processing');
+
+            const isOnline = navigator.onLine && apiKey.trim() !== "";
+
+            if (isOnline) {
+                // Modo Online: Consultar Gemini API
+                await queryGemini(text);
+            } else {
+                // Modo Offline: Procesamiento por reglas locales
+                setTimeout(() => {
+                    processSpeechOffline(text);
+                }, 1000);
+            }
+        }
+
+        // --- CEREBRO OFFLINE (Procesamiento local sin internet) ---
+        function processSpeechOffline(text) {
+            const cleanText = text.toLowerCase().trim();
+            let responseMsg = "";
+            playChime('success');
+
+            // 1. Detección de Nota
+            if (cleanText.startsWith("nota ") || cleanText.startsWith("guardar nota ") || cleanText.startsWith("anota ")) {
+                let noteContent = text;
+                const match = text.match(/(?:guardar nota|nota|anota)\s+(.+)/i);
+                if (match) noteContent = match[1];
+                
+                saveItemToLocal('nota', noteContent);
+                responseMsg = `He guardado la nota en tu iPhone localmente: "${noteContent}".`;
+            }
+            // 2. Detección de Recordatorio
+            else if (cleanText.includes("recuerda") || cleanText.includes("recordatorio") || cleanText.includes("alerta")) {
+                let minutes = 5; // Por defecto
+                let content = text;
+                
+                // Intentar extraer números de minutos
+                const minMatch = cleanText.match(/(\d+)\s*minuto/);
+                if (minMatch) {
+                    minutes = parseInt(minMatch[1]);
+                } else if (cleanText.includes("una hora") || cleanText.includes("1 hora")) {
+                    minutes = 60;
+                }
+
+                // Intentar extraer contenido
+                const contentMatch = text.match(/(?:recuerda|recordatorio|alerta|recuérdame)(?:\s+en\s+\d+\s+minutos)?(?:\s+a)?\s+(.+)/i);
+                if (contentMatch) content = contentMatch[1];
+                
+                // Programar fecha
+                const limitDate = new Date();
+                limitDate.setMinutes(limitDate.getMinutes() + minutes);
+                const limitDateStr = formatDate(limitDate);
+
+                saveItemToLocal('recordatorio', content, limitDateStr);
+                responseMsg = `Entendido. Te recordaré "${content}" en ${minutes} minutos.`;
+            }
+            // 3. Listar pendientes
+            else if (cleanText.includes("ver") || cleanText.includes("lista") || cleanText.includes("agenda") || cleanText.includes("qué tengo")) {
+                const list = JSON.parse(localStorage.getItem('rafiqui_agenda') || "[]");
+                const activeReminders = list.filter(item => item.type === 'recordatorio' && !item.completed);
+                
+                if (activeReminders.length === 0) {
+                    responseMsg = "No tienes tareas ni recordatorios pendientes.";
+                } else {
+                    responseMsg = `Tienes ${activeReminders.length} tareas pendientes: ` + 
+                                  activeReminders.map((r, i) => `${i + 1}. ${r.content}`).join(", ");
+                }
+            } 
+            // 4. Saludos y otros
+            else if (cleanText.includes("hola") || cleanText.includes("buenos días")) {
+                responseMsg = "Hola, te habla Rafiqui. Estamos en modo sin conexión, pero puedo guardar tus notas y alarmas de forma local.";
+            } else {
+                // Guardar como nota por defecto si no se reconoce el patrón
+                saveItemToLocal('nota', text);
+                responseMsg = `No tengo conexión a internet, así que guardé tu frase como una nota rápida: "${text}".`;
+            }
+
+            chatBubble.innerText = responseMsg;
+            speak(responseMsg, () => {
+                // Reactivar escucha automática si el usuario quiere seguir
+                promptForFollowUp();
+            });
+        }
+
+        // --- CEREBRO ONLINE (Gemini API Directo) ---
+        async function queryGemini(userPrompt) {
+            const systemPrompt = `
+                Eres Rafiqui, un asistente virtual tipo Siri amigable e inteligente. Tu tarea es ayudar al usuario a gestionar su agenda de notas y tareas pendientes.
+                
+                El usuario te hablará por voz. Debes responder brevemente (1 o 2 frases máximo) en español.
+                Al recibir una orden, debes identificar si desea guardar una nota o un recordatorio e incluir una llamada de herramienta estructurada al final de tu texto.
+                
+                Herramientas que tienes disponibles (usa exactamente este formato al final de tu respuesta):
+                - Para crear una nota de texto: [[TOOL: create_note | contenido de la nota]]
+                - Para crear un recordatorio (con alarma): Calcula la fecha y hora absoluta basándote en la fecha y hora actual en los datos del sistema. Usa el formato: [[TOOL: create_reminder | YYYY-MM-DD HH:MM:SS | mensaje]]
+                - Para listar notas: [[TOOL: list_notes]]
+                - Para listar recordatorios: [[TOOL: list_reminders]]
+                - Para borrar o completar un elemento (usa su ID): [[TOOL: complete_task | id_del_elemento]]
+                
+                Ejemplos de respuesta:
+                "Entendido, he anotado que debes apagar el horno en 10 minutos. [[TOOL: create_reminder | 2026-06-29 13:45:00 | apagar el horno]]"
+                "Claro, he guardado la nota que me pediste. [[TOOL: create_note | comprar huevos y leche]]"
+                "Aquí tienes tus recordatorios pendientes. [[TOOL: list_reminders]]"
+                
+                Si la orden no se relaciona con guardar notas o alarmas, simplemente responde de forma concisa sin herramientas.
+                REGLA: Responde siempre en español, sin emojis, sin usar asteriscos ni markdown, solo texto plano.
+            `;
+
+            // Agregar información horaria al prompt para que Gemini sepa calcular fechas relativas
+            const now = new Date();
+            const dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+            const timeCtx = `DATOS DEL SISTEMA: Fecha: ${formatDate(now).split(' ')[0]} | Hora: ${formatDate(now).split(' ')[1]} | Día: ${dias[now.getDay() === 0 ? 6 : now.getDay() - 1]}`;
+
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [
+                            { role: 'user', parts: [{ text: `${timeCtx}\n\nConsulta del usuario: ${userPrompt}` }] }
+                        ],
+                        systemInstruction: { parts: [{ text: systemPrompt }] }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error("Respuesta de API inválida");
+                }
+
+                const resData = await response.json();
+                let aiText = resData.candidates[0].content.parts[0].text.trim();
+                console.log("[GEMINI RAW]", aiText);
+
+                // Procesar e interpretar llamadas a herramientas del texto retornado
+                let speechText = aiText;
+                let toolExecutedText = "";
+
+                if (aiText.includes("[[")) {
+                    // Limpiar el texto hablado para que no lea la herramienta estructurada
+                    speechText = aiText.split("[[")[0].trim();
+                    
+                    const toolMatch = aiText.match(/\[\[TOOL:\s*(.*?)\s*\]\]/);
+                    if (toolMatch) {
+                        const toolCall = toolMatch[1];
+                        let toolName = toolCall;
+                        let toolArgs = "";
+                        
+                        if (toolCall.includes("|")) {
+                            toolName = toolCall.split("|")[0].trim();
+                            toolArgs = toolCall.split("|")[1].trim();
+                        }
+                        
+                        console.log(`[CLIENT TOOL] Executing ${toolName} with: ${toolArgs}`);
+                        toolExecutedText = executeClientTool(toolName, toolArgs);
+                    }
+                }
+
+                // Presentar respuesta
+                chatBubble.innerText = speechText;
+                playChime('success');
+                
+                // Si la herramienta nos dio datos para agregar al discurso final (ej: listado de tareas)
+                if (toolExecutedText) {
+                    speechText += " " + toolExecutedText;
+                }
+
+                speak(speechText, () => {
+                    promptForFollowUp();
+                });
+
+            } catch (e) {
+                console.error("Gemini API Error:", e);
+                chatBubble.innerText = "Tengo un problema para conectarme a los núcleos de Gemini. Procesando de forma local...";
+                // Fallback inmediato offline si falla la llamada online
+                processSpeechOffline(userPrompt);
+            }
+        }
+
+        // Ejecutar las herramientas de la base de datos de manera 100% cliente (iPhone localStorage)
+        function executeClientTool(name, args) {
+            if (name === 'create_note') {
+                saveItemToLocal('nota', args);
+                return "";
+            } 
+            else if (name === 'create_reminder') {
+                // args format: 'YYYY-MM-DD HH:MM:SS | contenido'
+                if (args.includes("|")) {
+                    const parts = args.split("|");
+                    const dateStr = parts[0].trim();
+                    const content = parts[1].trim();
+                    saveItemToLocal('recordatorio', content, dateStr);
+                }
+                return "";
+            } 
+            else if (name === 'list_notes') {
+                const list = JSON.parse(localStorage.getItem('rafiqui_agenda') || "[]");
+                const notes = list.filter(item => item.type === 'nota');
+                if (notes.length === 0) return "No tienes notas guardadas.";
+                return "Tienes las siguientes notas: " + notes.map((n, i) => `${n.content}`).join(", ");
+            } 
+            else if (name === 'list_reminders') {
+                const list = JSON.parse(localStorage.getItem('rafiqui_agenda') || "[]");
+                const reminders = list.filter(item => item.type === 'recordatorio' && !item.completed);
+                if (reminders.length === 0) return "No tienes recordatorios pendientes.";
+                return "Tus recordatorios pendientes son: " + reminders.map((r, i) => `${r.content} programado para el ${r.remindAt}`).join(". ");
+            }
+            else if (name === 'complete_task') {
+                const itemId = parseInt(args.trim());
+                const list = JSON.parse(localStorage.getItem('rafiqui_agenda') || "[]");
+                const item = list.find(item => item.id === itemId);
+                if (item) {
+                    item.completed = true;
+                    localStorage.setItem('rafiqui_agenda', JSON.stringify(list));
+                    loadAgenda();
+                    return `He marcado el elemento con el identificador ${itemId} como completado.`;
+                }
+                return `No encontré ningún elemento con el identificador ${itemId}.`;
+            }
+            return "";
+        }
+
+        // --- PERSISTENCIA LOCAL (localStorage de iPhone) ---
+        function saveItemToLocal(type, content, remindAt = null) {
+            const list = JSON.parse(localStorage.getItem('rafiqui_agenda') || "[]");
+            const newItem = {
+                id: Date.now(),
+                type: type,
+                content: content,
+                remindAt: remindAt,
+                completed: false,
+                createdAt: formatDate(new Date())
+            };
+            list.push(newItem);
+            localStorage.setItem('rafiqui_agenda', JSON.stringify(list));
+            loadAgenda();
+        }
+
+        // --- CONTROLADOR DE VISTA DE AGENDA ---
+        function loadAgenda() {
+            const list = JSON.parse(localStorage.getItem('rafiqui_agenda') || "[]");
+            const container = document.getElementById('agenda-list');
+            container.innerHTML = "";
+
+            let filteredList = [];
+            if (currentTab === 'reminders') {
+                filteredList = list.filter(item => item.type === 'recordatorio' && !item.completed);
+            } else {
+                filteredList = list.filter(item => item.type === 'nota');
+            }
+
+            if (filteredList.length === 0) {
+                container.innerHTML = `<p style="color:var(--text-dim); text-align:center; margin-top:40px;">No hay elementos guardados en esta categoría.</p>`;
+                return;
+            }
+
+            filteredList.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'agenda-item';
+                
+                let metaHTML = `<span>Guardado: ${item.createdAt}</span>`;
+                if (item.type === 'recordatorio') {
+                    metaHTML = `<span>Alarma: <span class="time">${item.remindAt}</span></span>`;
+                }
+
+                div.innerHTML = `
+                    <div class="agenda-details">
+                        <div class="agenda-text">${item.content}</div>
+                        <div class="agenda-meta">
+                            ${metaHTML}
+                        </div>
+                    </div>
+                    <button class="delete-btn" onclick="deleteItem(${item.id})">Borrar</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function deleteItem(id) {
+            let list = JSON.parse(localStorage.getItem('rafiqui_agenda') || "[]");
+            list = list.filter(item => item.id !== id);
+            localStorage.setItem('rafiqui_agenda', JSON.stringify(list));
+            loadAgenda();
+        }
+
+        function switchAgendaTab(tab) {
+            currentTab = tab;
+            document.getElementById('tab-reminders').classList.remove('active');
+            document.getElementById('tab-notes').classList.remove('active');
+            
+            if (tab === 'reminders') {
+                document.getElementById('tab-reminders').classList.add('active');
+            } else {
+                document.getElementById('tab-notes').classList.add('active');
+            }
+            loadAgenda();
+        }
+
+        function toggleAgenda(show) {
+            const sheet = document.getElementById('agenda-sheet');
+            const scrim = document.getElementById('scrim');
+            if (show) {
+                sheet.classList.add('open');
+                scrim.classList.add('visible');
+                loadAgenda();
+            } else {
+                sheet.classList.remove('open');
+                scrim.classList.remove('visible');
+            }
+        }
+
+        // --- PREGUNTA DE CONTINUIDAD (Para seguir dictando sin tocar la pantalla) ---
+        function promptForFollowUp() {
+            // Esperar 1.2 segundos tras finalizar la voz y activar la escucha
+            setTimeout(() => {
+                if (!isListening && !isSpeaking) {
+                    triggerVoiceActivation();
+                }
+            }, 1200);
+        }
+
+        // --- MONITOR DE ALARMAS LOCALES ---
+        function startReminderMonitor() {
+            if (reminderCheckingInterval) clearInterval(reminderCheckingInterval);
+            
+            reminderCheckingInterval = setInterval(() => {
+                const list = JSON.parse(localStorage.getItem('rafiqui_agenda') || "[]");
+                const now = new Date();
+                const nowStr = formatDate(now);
+
+                list.forEach(item => {
+                    if (item.type === 'recordatorio' && !item.completed && item.remindAt) {
+                        // Comparación lexográfica de fechas YYYY-MM-DD HH:MM:SS
+                        if (nowStr >= item.remindAt) {
+                            triggerReminderAlert(item);
+                        }
+                    }
+                });
+            }, 2000); // Revisar cada 2 segundos
+        }
+
+        function triggerReminderAlert(item) {
+            // Marcar recordatorio como completado
+            let list = JSON.parse(localStorage.getItem('rafiqui_agenda') || "[]");
+            const dbItem = list.find(x => x.id === item.id);
+            if (dbItem) {
+                dbItem.completed = true;
+                localStorage.setItem('rafiqui_agenda', JSON.stringify(list));
+            }
+
+            // Activar visual y auditivamente en el iPhone
+            const overlay = document.getElementById('alert-overlay');
+            const msgEl = document.getElementById('alert-message');
+            msgEl.innerText = item.content;
+            overlay.style.display = "flex";
+
+            // Vibración nativa (si está soportada)
+            if (navigator.vibrate) {
+                navigator.vibrate([300, 100, 300, 100, 300]);
+            }
+
+            // Reproducir alarma
+            const alarmInterval = setInterval(() => {
+                if (overlay.style.display === "flex") {
+                    playChime('alarm');
+                } else {
+                    clearInterval(alarmInterval);
+                }
+            }, 1000);
+
+            // Anunciar alarma por voz
+            speak(`Atención. Tienes un recordatorio pendiente: ${item.content}`);
+        }
+
+        function dismissReminderAlert() {
+            document.getElementById('alert-overlay').style.display = "none";
+            loadAgenda();
+        }
+
+        // --- PANEL DE AJUSTES ---
+        function toggleSettings(show) {
+            const modal = document.getElementById('settings-modal');
+            if (show) {
+                document.getElementById('api-key-input').value = apiKey;
+                modal.style.display = "flex";
+            } else {
+                modal.style.display = "none";
+            }
+        }
+
+        function saveApiKey() {
+            const keyVal = document.getElementById('api-key-input').value.trim();
+            localStorage.setItem('gemini_api_key', keyVal);
+            apiKey = keyVal;
+            toggleSettings(false);
+            chatBubble.innerText = "Clave de API guardada. Ya puedes hablarme.";
+            checkOnlineStatus();
+        }
+
+        // --- FUNCIONES AUXILIARES ---
+        function formatDate(date) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            const hh = String(date.getHours()).padStart(2, '0');
+            const mm = String(date.getMinutes()).padStart(2, '0');
+            const ss = String(date.getSeconds()).padStart(2, '0');
+            return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+        }
+    </script>
+</body>
+</html>
