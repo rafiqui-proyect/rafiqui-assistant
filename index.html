@@ -659,7 +659,7 @@
                 <img src="rafiqui_avatar.jpg" alt="Rafiqui Avatar" class="avatar-image" id="avatar-img" onclick="triggerVoiceActivation()">
             </div>
             <div class="chat-bubble" id="chat-bubble">
-                <span>Hola, soy Rafiqui. Toca mi imagen o di mi nombre para dictarme algo.</span>
+                <span>Hola, soy Rafiqui. Toca mi imagen por primera vez para activarme y desbloquear mi voz.</span>
             </div>
         </div>
 
@@ -746,6 +746,14 @@
         let wakeLock = null;
         let reminderCheckingInterval = null;
         let speechVoice = null;
+        let isWakeWordMode = false; // Se activa tras la primera interacción del usuario
+        let activeSession = false;   // True cuando se está capturando un comando real
+
+        // --- DEPURADOR DE ERRORES GLOBAL PARA MÓVIL ---
+        window.onerror = function(msg, url, line, col, error) {
+            console.error(`[JS ERROR] ${msg} en ${line}:${col}`);
+            return false;
+        };
         
         const chatBubble = document.getElementById('chat-bubble');
         const avatarContainer = document.getElementById('avatar-container');
@@ -857,15 +865,46 @@
 
             recognition.onstart = () => {
                 isListening = true;
-                setAvatarState('listening');
-                chatBubble.innerHTML = "<span class='pulse-text'>Te escucho...</span>";
-                playChime('start');
+                
+                // Si está en modo escucha silenciosa de Wake Word
+                if (isWakeWordMode && !activeSession) {
+                    setAvatarState('idle');
+                    chatBubble.innerHTML = "<span>Di <strong>'Rafiqui'</strong> o toca el avatar para hablar...</span>";
+                    // Indicador azul cian para mostrar que el micrófono está activo en el fondo
+                    statusDot.style.background = 'var(--accent)';
+                    statusDot.style.boxShadow = '0 0 10px var(--accent)';
+                } else {
+                    // Sesión de dictado activa
+                    setAvatarState('listening');
+                    chatBubble.innerHTML = "<span class='pulse-text'>Te escucho...</span>";
+                    playChime('start');
+                    
+                    statusDot.style.background = 'var(--success)';
+                    statusDot.style.boxShadow = '0 0 10px var(--success)';
+                }
             };
 
             recognition.onresult = (event) => {
                 const text = event.results[0][0].transcript;
                 console.log("[STT RESULT] " + text);
-                processUserSpeech(text);
+                
+                // Si escuchamos en segundo plano por el Wake Word
+                if (isWakeWordMode && !activeSession) {
+                    const textClean = text.toLowerCase();
+                    if (textClean.includes("rafiqui") || textClean.includes("rafiki")) {
+                        // ¡Wake Word detectado!
+                        activeSession = true;
+                        isWakeWordMode = false;
+                        
+                        // Detener la escucha actual silenciosa para reiniciar una sesión de dictado de comando activa
+                        recognition.stop();
+                    } else {
+                        console.log("[WAKE WORD SILENT] Frase ignorada: " + text);
+                    }
+                } else {
+                    // Procesar comando normal
+                    processUserSpeech(text);
+                }
             };
 
             recognition.onerror = (event) => {
@@ -873,25 +912,59 @@
                 if (event.error === 'not-allowed') {
                     chatBubble.innerHTML = "<span style='color:var(--danger);'>Permiso de micrófono denegado. Habilítalo en los ajustes de Safari.</span>";
                 } else {
-                    chatBubble.innerText = "No logré escucharte bien. Toca la pantalla e intenta de nuevo.";
+                    // En caso de silencio en modo Wake Word, simplemente ignoramos el error
+                    if (!isWakeWordMode || activeSession) {
+                        chatBubble.innerText = "No logré escucharte bien. Toca la pantalla e intenta de nuevo.";
+                    }
                 }
                 setAvatarState('idle');
             };
 
             recognition.onend = () => {
                 isListening = false;
-                if (avatarContainer.classList.contains('listening')) {
-                    setAvatarState('idle');
+                
+                if (activeSession) {
+                    // Si se detiene y es sesión activa, significa que ya capturamos y procesamos.
+                    // La reactivación ocurrirá en promptForFollowUp tras hablar la respuesta.
+                } else {
+                    // Si estamos en modo de espera silenciosa de Wake Word, re-iniciamos la escucha de inmediato
+                    if (isWakeWordMode && !isSpeaking) {
+                        setTimeout(() => {
+                            if (!isListening && !isSpeaking) {
+                                try {
+                                    recognition.start();
+                                } catch (e) {
+                                    console.log("Wake Word restart error: ", e);
+                                }
+                            }
+                        }, 300);
+                    }
                 }
             };
         }
 
         // Trigger voice recognition
         function triggerVoiceActivation() {
+            console.log("Activando voz manualmente...");
+            
+            // --- TRUCO CRÍTICO DE DESBLOQUEO DE AUDIO DE VOZ EN IOS SAFARI ---
+            // Reproducimos una frase en silencio sincronizada con el tap del usuario.
+            // Esto desbloquea el canal para permitir TTS asíncrono posterior desde la IA.
+            if (window.speechSynthesis) {
+                const unlockUtterance = new SpeechSynthesisUtterance(" ");
+                unlockUtterance.volume = 0;
+                window.speechSynthesis.speak(unlockUtterance);
+                console.log("[IOS TTS UNLOCKED]");
+            }
+            
             if (isSpeaking) {
                 window.speechSynthesis.cancel();
                 isSpeaking = false;
             }
+            
+            // Forzar entrada directa a modo de captura de comando
+            isWakeWordMode = false;
+            activeSession = true;
             
             if (isListening) {
                 recognition.stop();
@@ -899,8 +972,10 @@
                 try {
                     recognition.start();
                 } catch (e) {
-                    console.log("Re-start error: ", e);
+                    alert("Error en micrófono: " + e.message);
                 }
+            } else {
+                alert("El reconocimiento de voz no está inicializado.");
             }
         }
 
@@ -1286,10 +1361,16 @@
 
         // --- PREGUNTA DE CONTINUIDAD (Para seguir dictando sin tocar la pantalla) ---
         function promptForFollowUp() {
-            // Esperar 1.2 segundos tras finalizar la voz y activar la escucha
             setTimeout(() => {
                 if (!isListening && !isSpeaking) {
-                    triggerVoiceActivation();
+                    // Activar el modo de escucha en segundo plano para el llamado "Rafiqui"
+                    isWakeWordMode = true;
+                    activeSession = false;
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        console.log("Follow-up error: ", e);
+                    }
                 }
             }, 1200);
         }
