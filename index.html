@@ -1488,6 +1488,10 @@
                     "ACTION:DISPLAY",
                     "DESCRIPTION:Reminder",
                     "END:VALARM",
+                    "BEGIN:VALARM",
+                    "TRIGGER:-PT0M", // Alarma sonora nativa de calendario
+                    "ACTION:AUDIO",
+                    "END:VALARM",
                     "END:VEVENT",
                     "END:VCALENDAR"
                 ].join("\r\n");
