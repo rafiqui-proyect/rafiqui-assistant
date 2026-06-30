@@ -637,6 +637,51 @@
             opacity: 1;
             pointer-events: auto;
         }
+
+        /* Agrupamiento de Agenda por Días */
+        .agenda-day-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-top: 25px;
+            margin-bottom: 8px;
+            padding-bottom: 5px;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+        }
+
+        .agenda-day-header h3 {
+            font-size: 0.85rem;
+            font-weight: 800;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 0;
+        }
+
+        .header-date-sub {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            font-weight: 500;
+        }
+
+        .agenda-time-pill {
+            display: inline-flex;
+            align-items: center;
+            background: rgba(0, 242, 254, 0.08);
+            border: 1px solid rgba(0, 242, 254, 0.15);
+            color: var(--accent);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+
+        .agenda-time-pill.note {
+            background: rgba(168, 85, 247, 0.08);
+            border: 1px solid rgba(168, 85, 247, 0.15);
+            color: #c084fc;
+        }
     </style>
 </head>
 <body>
@@ -1256,9 +1301,15 @@
 
             let filteredList = [];
             if (currentTab === 'reminders') {
+                // Filtrar solo recordatorios pendientes
                 filteredList = list.filter(item => item.type === 'recordatorio' && !item.completed);
+                // Ordenar cronológicamente ascendente (fecha y hora)
+                filteredList.sort((a, b) => a.remindAt.localeCompare(b.remindAt));
             } else {
+                // Filtrar notas
                 filteredList = list.filter(item => item.type === 'nota');
+                // Ordenar cronológicamente descendente (más nuevas primero)
+                filteredList.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
             }
 
             if (filteredList.length === 0) {
@@ -1266,26 +1317,117 @@
                 return;
             }
 
+            // Agrupar elementos por fecha (sin la hora)
+            const groups = {};
             filteredList.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'agenda-item';
-                
-                let metaHTML = `<span>Guardado: ${item.createdAt}</span>`;
-                if (item.type === 'recordatorio') {
-                    metaHTML = `<span>Alarma: <span class="time">${item.remindAt}</span></span>`;
+                const dateStr = item.type === 'recordatorio' ? item.remindAt.split(" ")[0] : item.createdAt.split(" ")[0];
+                if (!groups[dateStr]) {
+                    groups[dateStr] = [];
                 }
-
-                div.innerHTML = `
-                    <div class="agenda-details">
-                        <div class="agenda-text">${item.content}</div>
-                        <div class="agenda-meta">
-                            ${metaHTML}
-                        </div>
-                    </div>
-                    <button class="delete-btn" onclick="deleteItem(${item.id})">Borrar</button>
-                `;
-                container.appendChild(div);
+                groups[dateStr].push(item);
             });
+
+            // Ordenar las fechas de los grupos
+            const sortedDates = Object.keys(groups);
+            if (currentTab === 'reminders') {
+                sortedDates.sort((a, b) => a.localeCompare(b));
+            } else {
+                sortedDates.sort((a, b) => b.localeCompare(a));
+            }
+
+            // Renderizar los grupos de la agenda
+            sortedDates.forEach(dateStr => {
+                const headerText = getFriendlyDayHeader(dateStr);
+                const subText = formatDateSub(dateStr);
+                
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'agenda-day-header';
+                headerDiv.innerHTML = `
+                    <h3>${headerText}</h3>
+                    <span class="header-date-sub">${subText}</span>
+                `;
+                container.appendChild(headerDiv);
+
+                groups[dateStr].forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'agenda-item';
+                    
+                    let timeHTML = "";
+                    if (item.type === 'recordatorio') {
+                        const timeStr = item.remindAt.split(" ")[1]; // HH:MM:SS
+                        const friendlyTime = formatFriendlyTime(timeStr);
+                        timeHTML = `<span class="agenda-time-pill">⏰ ${friendlyTime}</span>`;
+                    } else {
+                        const timeStr = item.createdAt.split(" ")[1]; // HH:MM:SS
+                        const friendlyTime = formatFriendlyTime(timeStr);
+                        timeHTML = `<span class="agenda-time-pill note">📝 ${friendlyTime}</span>`;
+                    }
+
+                    div.innerHTML = `
+                        <div class="agenda-details">
+                            <div class="agenda-text">${item.content}</div>
+                            <div class="agenda-meta">
+                                ${timeHTML}
+                            </div>
+                        </div>
+                        <button class="delete-btn" onclick="deleteItem(${item.id})">Borrar</button>
+                    `;
+                    container.appendChild(div);
+                });
+            });
+        }
+
+        // --- FUNCIONES AUXILIARES DE FORMATEO DE FECHA/HORA ---
+        function getFriendlyDayHeader(dateStr) {
+            const today = new Date();
+            const todayStr = formatDate(today).split(" ")[0];
+            
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const tomorrowStr = formatDate(tomorrow).split(" ")[0];
+            
+            if (dateStr === todayStr) {
+                return "HOY";
+            } else if (dateStr === tomorrowStr) {
+                return "MAÑANA";
+            }
+            
+            try {
+                const parts = dateStr.split("-");
+                // Crear objeto de fecha interpretando la zona horaria local
+                const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+                const options = { weekday: 'long' };
+                let weekday = dateObj.toLocaleDateString('es-ES', options);
+                return weekday.charAt(0).toUpperCase() + weekday.slice(1);
+            } catch (e) {
+                return dateStr;
+            }
+        }
+
+        function formatDateSub(dateStr) {
+            try {
+                const parts = dateStr.split("-");
+                const monthsShort = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+                const day = parseInt(parts[2]);
+                const month = monthsShort[parseInt(parts[1]) - 1];
+                return `${day} ${month}`;
+            } catch (e) {
+                return dateStr;
+            }
+        }
+
+        function formatFriendlyTime(timeStr) {
+            try {
+                const parts = timeStr.split(":");
+                let hours = parseInt(parts[0]);
+                const minutes = parts[1];
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                hours = hours % 12;
+                hours = hours ? hours : 12;
+                return `${hours}:${minutes} ${ampm}`;
+            } catch(e) {
+                return timeStr;
+            }
         }
 
         function deleteItem(id) {
