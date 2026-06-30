@@ -929,11 +929,26 @@
         function initSpeechSynthesis() {
             if (!window.speechSynthesis) return;
             
-            // Cargar y seleccionar la mejor voz en español
+            // Cargar y seleccionar la mejor voz en español MASCULINA
             const selectVoice = () => {
                 const voices = window.speechSynthesis.getVoices();
-                // Buscar voces en español (Sonia, Monica, Paulina, etc. de iOS)
-                speechVoice = voices.find(v => v.lang.includes('es-') || v.lang.includes('es_')) || voices[0];
+                const maleVoiceNames = ['jorge', 'juan', 'diego', 'alvaro', 'david', 'male', 'hombre', 'voice 1', 'voice 3'];
+                
+                let foundVoice = voices.find(v => {
+                    const isSpanish = v.lang.includes('es-') || v.lang.includes('es_') || v.lang.startsWith('es');
+                    if (!isSpanish) return false;
+                    
+                    const nameLower = v.name.toLowerCase();
+                    return maleVoiceNames.some(name => nameLower.includes(name));
+                });
+
+                // Fallback a cualquier voz en español
+                if (!foundVoice) {
+                    foundVoice = voices.find(v => v.lang.includes('es-') || v.lang.includes('es_') || v.lang.startsWith('es'));
+                }
+                
+                speechVoice = foundVoice || voices[0];
+                console.log("[SPEECH VOICE SELECTED]", speechVoice ? speechVoice.name : "None");
             };
 
             selectVoice();
@@ -1144,7 +1159,8 @@
                         
                         if (toolCall.includes("|")) {
                             toolName = toolCall.split("|")[0].trim();
-                            toolArgs = toolCall.split("|")[1].trim();
+                            // Obtener todos los argumentos después del primer carácter "|"
+                            toolArgs = toolCall.substring(toolCall.indexOf("|") + 1).trim();
                         }
                         
                         console.log(`[CLIENT TOOL] Executing ${toolName} with: ${toolArgs}`);
