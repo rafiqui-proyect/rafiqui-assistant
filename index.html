@@ -997,13 +997,13 @@
             chatBubble.innerText = `"${text}"`;
             setAvatarState('processing');
 
-            const isOnline = navigator.onLine && apiKey.trim() !== "";
-
-            if (isOnline) {
-                // Modo Online: Consultar Gemini API
+            // Ignoramos navigator.onLine ya que en iOS y Safari suele reportar false erróneamente.
+            // Si existe la clave de API, intentamos consultar Gemini online. 
+            // Si hay un error real de red, el catch interno de queryGemini pasará automáticamente al modo offline.
+            if (apiKey && apiKey.trim() !== "") {
                 await queryGemini(text);
             } else {
-                // Modo Offline: Procesamiento por reglas locales
+                // Modo Offline: Procesamiento por reglas locales por falta de clave
                 setTimeout(() => {
                     processSpeechOffline(text);
                 }, 1000);
