@@ -1462,7 +1462,7 @@
                 // dateStr format: "YYYY-MM-DD HH:MM:SS"
                 const timePart = dateStr.split(" ")[1]; // HH:MM:SS
                 const hm = timePart.substring(0, 5); // HH:MM (ej. 13:50)
-                const inputText = `${hm} | ${content}`;
+                const inputText = hm; // Enviar únicamente la hora para simplificar el atajo al máximo
                 
                 // Redirigir al esquema de Atajos de iOS
                 const url = `shortcuts://run-shortcut?name=Crear%20Alarma%20Rafiqui&input=${encodeURIComponent(inputText)}`;
@@ -1550,17 +1550,16 @@
                 navigator.vibrate([300, 100, 300, 100, 300]);
             }
 
-            // Reproducir alarma
-            const alarmInterval = setInterval(() => {
-                if (overlay.style.display === "flex") {
-                    playChime('alarm');
-                } else {
-                    clearInterval(alarmInterval);
-                }
-            }, 1000);
-
-            // Anunciar alarma por voz
-            speak(`Atención. Tienes un recordatorio pendiente: ${item.content}`);
+            // Anunciar alarma por voz primero, y activar el sonido repetitivo al terminar de hablar
+            speak(`Atención. Tienes un recordatorio pendiente: ${item.content}`, () => {
+                const alarmInterval = setInterval(() => {
+                    if (overlay.style.display === "flex") {
+                        playChime('alarm');
+                    } else {
+                        clearInterval(alarmInterval);
+                    }
+                }, 1500); // Espaciado de 1.5 segundos para no saturar el canal de audio
+            });
         }
 
         function dismissReminderAlert() {
