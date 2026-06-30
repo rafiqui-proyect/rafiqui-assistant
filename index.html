@@ -1190,7 +1190,7 @@
             const timeCtx = `DATOS DEL SISTEMA: Fecha: ${formatDate(now).split(' ')[0]} | Hora: ${formatDate(now).split(' ')[1]} | Día: ${dias[now.getDay() === 0 ? 6 : now.getDay() - 1]}`;
 
             try {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
